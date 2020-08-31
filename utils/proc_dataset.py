@@ -3,29 +3,32 @@ import os
 import subprocess
 
 
-source_dir = './fgvc-aircraft-2013b/data'
-target_dir = './aircraft'
-
-percentage_train_class = 70
-percentage_val_class = 15
-percentage_test_class = 15
-train_val_test_ratio = [
-    percentage_train_class, percentage_val_class, percentage_test_class]
+source_dir = 'data/fgvc-aircraft-2013b/data'
+target_dir = 'data/aircraft'
 
 with open(os.path.join(source_dir, 'variants.txt')) as f:
     lines = f.readlines()
     classes = [line.strip() for line in lines]
 
-rs = np.random.RandomState(123)
-rs.shuffle(classes)
-num_train, num_val, num_test = [
-    int(float(ratio)/np.sum(train_val_test_ratio)*len(classes))
-    for ratio in train_val_test_ratio]
+# percentage_train_class = 70
+# percentage_val_class = 15
+# percentage_test_class = 15
+# train_val_test_ratio = [
+#     percentage_train_class, percentage_val_class, percentage_test_class]
+# rs = np.random.RandomState(123)
+# rs.shuffle(classes)
+# num_train, num_val, num_test = [
+#     int(float(ratio)/np.sum(train_val_test_ratio)*len(classes))
+#     for ratio in train_val_test_ratio]
+#
+# classes = {
+#     'train': classes[:num_train],
+#     'val': classes[num_train:num_train+num_val],
+#     'test': classes[num_train+num_val:]
+# }
 
 classes = {
-    'train': classes[:num_train],
-    'val': classes[num_train:num_train+num_val],
-    'test': classes[num_train+num_val:]
+    'all': classes
 }
 
 if not os.path.exists(target_dir):
@@ -56,7 +59,3 @@ for i, line in enumerate(lines):
     cmd = ['mv', image_source_path, image_target_path]
     subprocess.call(cmd)
     print('{}/{} {}'.format(i, len(lines), ' '.join(cmd)))
-
-# resize images
-cmd = ['python', 'get_dataset_script/resize_dataset.py', './data/aircraft']
-subprocess.call(cmd)
