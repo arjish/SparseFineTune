@@ -19,7 +19,7 @@ model_names = ['resnet', 'alexnet', 'vgg', 'squeezenet', 'densenet', 'inception'
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Feature Extraction')
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('-f', '--imageFolderName', default='test')
+parser.add_argument('-f', '--imageFolderName', default='all')
 parser.add_argument('--model', default='resnet',
     choices=model_names, help='model architecture')
 parser.add_argument('-n', '--num_classes', default=1000, type=int,
