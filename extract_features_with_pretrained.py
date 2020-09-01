@@ -7,7 +7,6 @@ import torch.optim.lr_scheduler as lr_scheduler
 import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
-import matplotlib.pyplot as plt
 import time
 import os
 import copy
@@ -15,12 +14,16 @@ import argparse
 # print("PyTorch Version: ",torch.__version__)
 # print("Torchvision Version: ",torchvision.__version__)
 
-model_names = ['resnet', 'alexnet', 'vgg', 'squeezenet', 'densenet', 'inception']
+model_names = ['alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn',
+               'vgg19_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+               'squeezenet1_0', 'squeezenet1_1', 'densenet121', 'densenet169', 'densenet201',
+               'densenet161', 'inception_v3', 'googlenet', 'shufflenet_v2', 'mobilenet_v2',
+               'esnext50_32x4d', 'resnext101_32x8d', 'wideresnet50_2', 'wideresnet101_2', 'mnasnet1_0']
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Feature Extraction')
 parser.add_argument('data', help='path to dataset')
 parser.add_argument('-f', '--imageFolderName', default='all')
-parser.add_argument('--model', default='resnet',
+parser.add_argument('--model', default='resnet18',
     choices=model_names, help='model architecture')
 parser.add_argument('-n', '--num_classes', default=1000, type=int,
     help='number of classes')
@@ -170,7 +173,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
     model_ft = None
     input_size = 0
 
-    if model_name == "resnet":
+    if model_name == "resnet18":
         """ Resnet18
         """
         model_ft = models.resnet18(pretrained=use_pretrained)
@@ -188,7 +191,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         model_ft.classifier[6] = nn.Linear(num_ftrs,num_classes)
         input_size = 224
 
-    elif model_name == "vgg":
+    elif model_name == "vgg11_bn":
         """ VGG11_bn
         """
         model_ft = models.vgg11_bn(pretrained=use_pretrained)
@@ -197,8 +200,8 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         model_ft.classifier[6] = nn.Linear(num_ftrs,num_classes)
         input_size = 224
 
-    elif model_name == "squeezenet":
-        """ Squeezenet
+    elif model_name == "squeezenet1_0":
+        """ Squeezenet1_0
         """
         model_ft = models.squeezenet1_0(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
@@ -206,8 +209,8 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         model_ft.num_classes = num_classes
         input_size = 224
 
-    elif model_name == "densenet":
-        """ Densenet
+    elif model_name == "densenet121":
+        """ Densenet121
         """
         model_ft = models.densenet121(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
@@ -215,7 +218,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         model_ft.classifier = nn.Linear(num_ftrs, num_classes)
         input_size = 224
 
-    elif model_name == "inception":
+    elif model_name == "inception_v3":
         """ Inception v3
         Be careful, expects (299,299) sized images and has auxiliary output
         """
