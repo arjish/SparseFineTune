@@ -242,7 +242,7 @@ def extract_features(data_loader, model):
 
     with torch.no_grad():
         for input, _, image_path in data_loader:
-            print(input.size())
+            # print(input.size())
             # compute output
             output_tensor = model(input.to(device))
             output_tensor = nn.AdaptiveAvgPool2d(output_size=(1, 1))(output_tensor)
@@ -290,7 +290,7 @@ def main():
     image_datasets = {}
 
     # Create training and validation datasets
-    image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
+    # image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
     image_datasets['val'] = ImageFolderWithPaths(os.path.join(data_dir, args.imageFolderName), data_transforms['val'])
     # # Create training and validation dataloaders
     # dataloaders_dict = {
@@ -300,7 +300,7 @@ def main():
         'val': torch.utils.data.DataLoader(image_datasets['val'], shuffle=False, batch_size=batch_size, num_workers=4)}
     # dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
     dataset_sizes = {'val': len(image_datasets['val'])}
-    class_names = image_datasets['train'].classes
+    # class_names = image_datasets['train'].classes
 
 
 
