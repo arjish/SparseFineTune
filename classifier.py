@@ -7,14 +7,14 @@ import torchvision
 import torchvision.transforms as transforms
 import argparse
 
-architecture_names = ['resnet', 'alexnet', 'vgg', 'squeezenet', 'densenet', 'inception']
+architecture_names = ['resnet18', 'alexnet', 'vgg11_bn', 'squeezenet1_0', 'densenet121', 'inception_v3']
 
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('--architecture', default='resnet',
+parser.add_argument('--architecture', default='resnet18',
     choices=architecture_names, help='model architecture')
 parser.add_argument('--domain_type', default='cross',
-    choices=['self', 'cross'], help='slef or cross domain testing')
+    choices=['self', 'cross'], help='self or cross domain testing')
 parser.add_argument('--nway', default=5, type=int,
     help='number of classes')
 parser.add_argument('--kshot', default=1, type=int,
@@ -113,7 +113,7 @@ def main():
     domain_type = args.domain_type
 
     if domain_type=='cross':
-        data_path = os.path.join(data, 'transferred_features_test')
+        data_path = os.path.join(data, 'transferred_features_all')
     else:
         data_path = os.path.join(data, 'features_test')
 

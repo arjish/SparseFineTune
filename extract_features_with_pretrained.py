@@ -70,7 +70,7 @@ class ImageFolderWithPaths(datasets.ImageFolder):
 
 def createFolderStructure():
     imageFolderName = args.imageFolderName
-    results_path = os.path.join(args.data, 'features_'+ imageFolderName, args.model)
+    results_path = os.path.join(args.data, 'transferred_features_'+ imageFolderName, args.model)
 
     data_path = os.path.join(args.data, imageFolderName)
     classFolders_list = [label \
@@ -255,7 +255,7 @@ def extract_features(data_loader, model):
             for i in range(output.shape[0]):
                 root, image_name = os.path.split(image_path[i])
                 root, folder_name = os.path.split(root)
-                save_path = os.path.join(args.data, 'features_'+imageFolderName, args.model, folder_name)
+                save_path = os.path.join(args.data, 'transferred_features_'+imageFolderName, args.model, folder_name)
                 # print(save_path)
                 np.save(os.path.join(save_path, image_name.split('.')[0]), output[i])
 
