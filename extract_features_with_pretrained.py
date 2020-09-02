@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import numpy as np
-import torchvision
 from torchvision import datasets, models, transforms
 import time
 import os
