@@ -1,3 +1,7 @@
+'''
+Note: Use centercrop(299) for inception and centercrop(224) for others in 'val'.
+'''
+
 from __future__ import print_function
 from __future__ import division
 import torch
@@ -281,7 +285,7 @@ def main():
         ]),
         'val': transforms.Compose([
             transforms.Resize(256),
-            transforms.CenterCrop(299),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),

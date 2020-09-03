@@ -27,6 +27,13 @@ parser.add_argument('--n_problems', default=600, type=int,
     help='number of test problems')
 parser.add_argument('--hidden_size', default=32, type=int,
     help='hidden layer size')
+parser.add_argument('--gamma', default=0.5, type=float,
+    help='constant value for L2')
+parser.add_argument('--linear', action='store_true', default=False,
+    help='set for linear model, otherwise use hidden layer')
+parser.add_argument('--nol2', action='store_true', default=False,
+    help='set for No L2 regularization, otherwise use L2')
+
 parser.add_argument('--gpu', default=0, type=int,
     help='GPU id to use.')
 
@@ -43,14 +50,18 @@ if device == 'cuda':
 class ClassifierNetwork(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes):
         super(ClassifierNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.tanh = nn.Tanh()
-        self.fc2 = nn.Linear(hidden_size, num_classes)
+        if not args.linear:
+            self.fc1 = nn.Linear(input_size, hidden_size)
+            self.tanh = nn.Tanh()
+            self.fc2 = nn.Linear(hidden_size, num_classes)
+        else:
+            self.fc1 = nn.Linear(input_size, num_classes)
 
     def forward(self, x):
         out = self.fc1(x)
-        out = self.tanh(out)
-        out = self.fc2(out)
+        if not args.linear:
+            out = self.tanh(out)
+            out = self.fc2(out)
         return out
 
 
@@ -67,13 +78,14 @@ def train_model(model, features, labels, criterion, optimizer,
         # Forward pass
         outputs = model(x)
         loss = criterion(outputs, y)
-        c = torch.tensor(0.5, device=device)
-        l2_reg = torch.tensor(0., device=device)
-        for name, param in model.named_parameters():
-            if 'weight' in name:
-                l2_reg += torch.norm(param)
+        if not args.nol2:
+            c = torch.tensor(args.gamma, device=device)
+            l2_reg = torch.tensor(0., device=device)
+            for name, param in model.named_parameters():
+                if 'weight' in name:
+                    l2_reg += torch.norm(param)
 
-        loss += c * l2_reg
+            loss += c * l2_reg
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -153,6 +165,10 @@ def main():
     # write the results to a file:
     fp = open('results_finetune.txt', 'a')
     result = 'Setting: ' + domain_type + '-' + data + '- ' + architecture
+    if args.linear:
+        result += ' linear'
+    if args.nol2:
+        result += ' No L2'
     result += ': ' + str(nway) + '-way ' + str(kshot) + '-shot'
     result += '; Accuracy: ' + str(acc_avg)
     result += ', ' + str(ci95) + '\n'
