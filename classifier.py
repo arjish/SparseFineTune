@@ -7,12 +7,12 @@ import torchvision
 import torchvision.transforms as transforms
 import argparse
 
-architecture_names = ['resnet18', 'alexnet', 'vgg11_bn', 'squeezenet1_0', 'densenet121', 'inception_v3']
+model_names = ['resnet18', 'alexnet', 'vgg11_bn', 'squeezenet1_0', 'densenet121', 'inception_v3']
 
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('--architecture', default='resnet18',
-    choices=architecture_names, help='model architecture')
+parser.add_argument('--model', default='resnet18',
+    choices=model_names, help='model architecture')
 parser.add_argument('--domain_type', default='cross',
     choices=['self', 'cross'], help='self or cross domain testing')
 parser.add_argument('--nway', default=5, type=int,
@@ -114,7 +114,7 @@ def test_model(model, features, labels):
 
 def main():
     data = args.data
-    architecture = args.architecture
+    model_name = args.model
     nway = args.nway
     kshot = args.kshot
     kquery = args.kquery
@@ -129,7 +129,7 @@ def main():
     else:
         data_path = os.path.join(data, 'features_test')
 
-    meta_folder = os.path.join(data_path, architecture)
+    meta_folder = os.path.join(data_path, model_name)
 
     folders = [os.path.join(meta_folder, label) \
                for label in os.listdir(meta_folder) \
@@ -164,7 +164,7 @@ def main():
 
     # write the results to a file:
     fp = open('results_finetune.txt', 'a')
-    result = 'Setting: ' + domain_type + '-' + data + '- ' + architecture
+    result = 'Setting: ' + domain_type + '-' + data + '- ' + model_name
     if args.linear:
         result += ' linear'
     if args.nol2:
