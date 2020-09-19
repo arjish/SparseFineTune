@@ -155,10 +155,10 @@ def get_image_features_multiple(data_path, model_folders,
         features_query_list.append(np.array([np.load(os.path.join(model_path, file))
                                                 for file in files_query]))
 
-    features_support = np.concatenate(features_support_list, axis=-1)
-    features_query = np.concatenate(features_query_list, axis=-1)
+    # features_support = np.concatenate(features_support_list, axis=-1)
+    # features_query = np.concatenate(features_query_list, axis=-1)
 
-    return features_support, labels_support, features_query, labels_query
+    return features_support_list, labels_support, features_query_list, labels_query
 
 # For matchingNet and RelationalNet:
 def one_hot(y, num_class):

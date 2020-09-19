@@ -1,22 +1,18 @@
 import numpy as np
-from utils.utils import get_image_features_all
+from utils.utils import get_image_features_multiple
 import os, random
 import torch
 import torch.nn as nn
+from math import ceil
 import torchvision
 import torchvision.transforms as transforms
 import argparse
 
-model_names = ['alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn',
-               'vgg19_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
-               'squeezenet1_0', 'squeezenet1_1', 'densenet121', 'densenet169', 'densenet201',
-               'densenet161', 'inception_v3', 'googlenet', 'shufflenet_v2', 'mobilenet_v2',
-               'esnext50_32x4d', 'resnext101_32x8d', 'wideresnet50_2', 'wideresnet101_2', 'mnasnet1_0']
+model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+               'densenet121', 'densenet161', 'densenet169', 'densenet201']
 
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('--model', default='resnet18',
-    choices=model_names, help='model architecture')
 parser.add_argument('--domain_type', default='cross',
     choices=['self', 'cross'], help='self or cross domain testing')
 parser.add_argument('--nway', default=5, type=int,
@@ -29,7 +25,9 @@ parser.add_argument('--num_epochs', default=50, type=int,
     help='number of epochs')
 parser.add_argument('--n_problems', default=600, type=int,
     help='number of test problems')
-parser.add_argument('--hidden_size', default=32, type=int,
+parser.add_argument('--hidden_size1', default=1024, type=int,
+    help='hidden layer size')
+parser.add_argument('--hidden_size2', default=128, type=int,
     help='hidden layer size')
 parser.add_argument('--lr', default=0.01, type=float,
     help='learning rate')
@@ -51,12 +49,13 @@ device = torch.device("cuda:"+str(args.gpu) if torch.cuda.is_available() else "c
 
 # Fully connected neural network with one hidden layer
 class ClassifierNetwork(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+    def __init__(self, input_size, num_classes):
         super(ClassifierNetwork, self).__init__()
         if not args.linear:
-            self.fc1 = nn.Linear(input_size, hidden_size)
+            self.fc1 = nn.Linear(input_size, args.hidden_size1)
             self.tanh = nn.Tanh()
-            self.fc2 = nn.Linear(hidden_size, num_classes)
+            self.fc2 = nn.Linear(args.hidden_size1, args.hidden_size2)
+            self.fc3 = nn.Linear(args.hidden_size2, num_classes)
         else:
             self.fc1 = nn.Linear(input_size, num_classes)
 
@@ -65,6 +64,8 @@ class ClassifierNetwork(nn.Module):
         if not args.linear:
             out = self.tanh(out)
             out = self.fc2(out)
+            out = self.tanh(out)
+            out = self.fc3(out)
         return out
 
 
@@ -111,14 +112,12 @@ def test_model(model, features, labels):
 
 def main():
     data = args.data
-    model_name = args.model
     nway = args.nway
     kshot = args.kshot
     kquery = args.kquery
     n_img = kshot + kquery
     n_problems = args.n_problems
     num_epochs = args.num_epochs
-    hidden_size = args.hidden_size
     domain_type = args.domain_type
 
     if domain_type=='cross':
@@ -126,25 +125,27 @@ def main():
     else:
         data_path = os.path.join(data, 'features_test')
 
-    meta_folder = os.path.join(data_path, model_name)
-
-    folders = [os.path.join(meta_folder, label) \
-               for label in os.listdir(meta_folder) \
-               if os.path.isdir(os.path.join(meta_folder, label)) \
-               ]
+    folder_0 = os.path.join(data_path, model_names[0])
+    metaval_labels = [label \
+                      for label in os.listdir(folder_0) \
+                      if os.path.isdir(os.path.join(folder_0, label)) \
+                      ]
+    labels = metaval_labels
 
     accs = []
     for i in range(n_problems):
-        sampled_folders = random.sample(folders, nway)
+        sampled_labels = random.sample(labels, nway)
 
-        features_support, labels_support, \
-        features_query, labels_query = get_image_features_all(sampled_folders,
-            range(nway), nb_samples=n_img, shuffle=True)
+        features_support_list, labels_support, \
+        features_query_list, labels_query = get_image_features_multiple(data_path, model_names,
+            sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
+        features_support = np.concatenate(features_support_list, axis=-1)
+        features_query = np.concatenate(features_query_list, axis=-1)
 
         input_size = features_support.shape[1]
         # print('features_query.shape:', features_query.shape)
 
-        model = ClassifierNetwork(input_size, hidden_size, nway).to(device)
+        model = ClassifierNetwork(input_size, nway).to(device)
         # Loss and optimizer
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -161,7 +162,7 @@ def main():
 
     # write the results to a file:
     fp = open('results_finetune.txt', 'a')
-    result = 'Setting: ' + domain_type + '-' + data + '- ' + model_name
+    result = 'Setting: Multiple ' + domain_type + '-' + data + '- ' + ', '.join(map(str, model_names))
     if args.linear:
         result += ' linear'
     if args.nol2:

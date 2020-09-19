@@ -1,22 +1,19 @@
 import numpy as np
-from utils.utils import get_image_features_all
+from utils.utils import get_image_features_multiple
 import os, random
 import torch
 import torch.nn as nn
+from math import ceil
 import torchvision
 import torchvision.transforms as transforms
 import argparse
 
-model_names = ['alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn',
-               'vgg19_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
-               'squeezenet1_0', 'squeezenet1_1', 'densenet121', 'densenet169', 'densenet201',
-               'densenet161', 'inception_v3', 'googlenet', 'shufflenet_v2', 'mobilenet_v2',
-               'esnext50_32x4d', 'resnext101_32x8d', 'wideresnet50_2', 'wideresnet101_2', 'mnasnet1_0']
+model_names = ['resnet18', 'alexnet', 'vgg11_bn', 'squeezenet1_0', 'densenet121']
 
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('--model', default='resnet18',
-    choices=model_names, help='model architecture')
+parser.add_argument('--soft', action='store_true', default=False,
+    help='set for soft bagging, otherwise hard bagging')
 parser.add_argument('--domain_type', default='cross',
     choices=['self', 'cross'], help='self or cross domain testing')
 parser.add_argument('--nway', default=5, type=int,
@@ -31,8 +28,6 @@ parser.add_argument('--n_problems', default=600, type=int,
     help='number of test problems')
 parser.add_argument('--hidden_size', default=32, type=int,
     help='hidden layer size')
-parser.add_argument('--lr', default=0.01, type=float,
-    help='learning rate')
 parser.add_argument('--gamma', default=0.5, type=float,
     help='constant value for L2')
 parser.add_argument('--linear', action='store_true', default=False,
@@ -95,14 +90,24 @@ def train_model(model, features, labels, criterion, optimizer,
         #     .format(epoch + 1, num_epochs, loss.item()))
 
 
-def test_model(model, features, labels):
-    x = torch.tensor(features, dtype=torch.float32, device=device)
+def test_model(models, features_list, labels):
     y = torch.tensor(labels, dtype=torch.long, device=device)
     with torch.no_grad():
         correct = 0
         total = 0
-        outputs = model(x)
-        _, predicted = torch.max(outputs.data, 1)
+        outputs_list = []
+        for i, model in enumerate(models):
+            x = torch.tensor(features_list[i], dtype=torch.float32, device=device)
+            outputs_list.append(model(x))
+        preds = torch.stack(outputs_list, dim=0)
+
+        if args.soft:
+            preds = torch.mean(preds, dim=0)
+            _, predicted = torch.max(preds, 1)
+        else:
+            _, preds = torch.max(preds, dim=-1)
+            predicted, _ = torch.mode(preds, dim=0)
+
         total += y.size(0)
         correct += (predicted==y).sum().item()
 
@@ -111,7 +116,6 @@ def test_model(model, features, labels):
 
 def main():
     data = args.data
-    model_name = args.model
     nway = args.nway
     kshot = args.kshot
     kquery = args.kquery
@@ -126,31 +130,33 @@ def main():
     else:
         data_path = os.path.join(data, 'features_test')
 
-    meta_folder = os.path.join(data_path, model_name)
-
-    folders = [os.path.join(meta_folder, label) \
-               for label in os.listdir(meta_folder) \
-               if os.path.isdir(os.path.join(meta_folder, label)) \
-               ]
+    folder_0 = os.path.join(data_path, model_names[0])
+    metaval_labels = [label \
+                      for label in os.listdir(folder_0) \
+                      if os.path.isdir(os.path.join(folder_0, label)) \
+                      ]
+    labels = metaval_labels
 
     accs = []
     for i in range(n_problems):
-        sampled_folders = random.sample(folders, nway)
+        sampled_labels = random.sample(labels, nway)
 
-        features_support, labels_support, \
-        features_query, labels_query = get_image_features_all(sampled_folders,
-            range(nway), nb_samples=n_img, shuffle=True)
+        features_support_list, labels_support, \
+        features_query_list, labels_query = get_image_features_multiple(data_path, model_names,
+            sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
 
-        input_size = features_support.shape[1]
-        # print('features_query.shape:', features_query.shape)
+        models = []
+        for model_id in range(len(model_names)):
+            input_size = features_support_list[model_id].shape[1]
+            # print('features_query.shape:', features_query.shape)
 
-        model = ClassifierNetwork(input_size, hidden_size, nway).to(device)
-        # Loss and optimizer
-        criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-        train_model(model, features_support, labels_support, criterion, optimizer, num_epochs)
+            models.append(ClassifierNetwork(input_size, hidden_size, nway).to(device))
+            # Loss and optimizer
+            criterion = nn.CrossEntropyLoss()
+            optimizer = torch.optim.Adam(models[model_id].parameters(), lr=0.01)
+            train_model(models[model_id], features_support_list[model_id], labels_support, criterion, optimizer, num_epochs)
 
-        accuracy_test = test_model(model, features_query, labels_query)
+        accuracy_test = test_model(models, features_query_list, labels_query)
 
         print(round(accuracy_test, 2))
         accs.append(accuracy_test)
@@ -161,7 +167,10 @@ def main():
 
     # write the results to a file:
     fp = open('results_finetune.txt', 'a')
-    result = 'Setting: ' + domain_type + '-' + data + '- ' + model_name
+    if args.soft:
+        result = 'Setting: Soft ensemble ' + domain_type + '-' + data + '- ' + ', '.join(map(str, model_names))
+    else:
+        result = 'Setting: Hard ensemble ' + domain_type + '-' + data + '- ' + ', '.join(map(str, model_names))
     if args.linear:
         result += ' linear'
     if args.nol2:

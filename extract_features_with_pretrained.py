@@ -184,6 +184,22 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
         input_size = 224
+    elif model_name == "resnet34":
+        """ Resnet34
+        """
+        model_ft = models.resnet34(pretrained=use_pretrained)
+    elif model_name == "resnet50":
+        """ Resnet50
+        """
+        model_ft = models.resnet50(pretrained=use_pretrained)
+    elif model_name == "resnet101":
+        """ Resnet101
+        """
+        model_ft = models.resnet101(pretrained=use_pretrained)
+    elif model_name == "resnet152":
+        """ Resnet152
+        """
+        model_ft = models.resnet152(pretrained=use_pretrained)
 
     elif model_name == "alexnet":
         """ Alexnet
@@ -220,6 +236,18 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         num_ftrs = model_ft.classifier.in_features
         model_ft.classifier = nn.Linear(num_ftrs, num_classes)
         input_size = 224
+    elif model_name == "densenet169":
+        """ Densenet169
+        """
+        model_ft = models.densenet169(pretrained=use_pretrained)
+    elif model_name == "densenet201":
+        """ Densenet201
+        """
+        model_ft = models.densenet201(pretrained=use_pretrained)
+    elif model_name == "densenet161":
+        """ Densenet161
+        """
+        model_ft = models.densenet161(pretrained=use_pretrained)
 
     elif model_name == "inception_v3":
         """ Inception v3
