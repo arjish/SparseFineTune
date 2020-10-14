@@ -16,18 +16,21 @@ import copy
 import argparse
 # print("PyTorch Version: ",torch.__version__)
 # print("Torchvision Version: ",torchvision.__version__)
+#
+# model_names = ['alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn',
+#                'vgg19_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+#                'squeezenet1_0', 'squeezenet1_1', 'densenet121', 'densenet169', 'densenet201',
+#                'densenet161', 'inception_v3', 'googlenet', 'shufflenet_v2', 'mobilenet_v2',
+#                'esnext50_32x4d', 'resnext101_32x8d', 'wideresnet50_2', 'wideresnet101_2', 'mnasnet1_0']
 
-model_names = ['alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn',
-               'vgg19_bn', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
-               'squeezenet1_0', 'squeezenet1_1', 'densenet121', 'densenet169', 'densenet201',
-               'densenet161', 'inception_v3', 'googlenet', 'shufflenet_v2', 'mobilenet_v2',
-               'esnext50_32x4d', 'resnext101_32x8d', 'wideresnet50_2', 'wideresnet101_2', 'mnasnet1_0']
+model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+               'densenet121', 'densenet169', 'densenet201', 'densenet161']
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Feature Extraction')
 parser.add_argument('data', help='path to dataset')
 parser.add_argument('-f', '--imageFolderName', default='all')
-parser.add_argument('--model', default='resnet18',
-    choices=model_names, help='model architecture')
+# parser.add_argument('--model', default='resnet18',
+#     choices=model_names, help='model architecture')
 parser.add_argument('-n', '--num_classes', default=1000, type=int,
     help='number of classes')
 parser.add_argument('--num_epochs', default=15, type=int,
@@ -48,7 +51,7 @@ args = parser.parse_args()
 # Flag for feature extracting. When False, we finetune the whole model,
 # when True we only update the reshaped layer params
 feature_extract = not args.not_extract
-model_name = args.model
+# model_name = args.model
 num_classes = args.num_classes
 data_dir = args.data
 batch_size = args.batch_size
@@ -72,9 +75,9 @@ class ImageFolderWithPaths(datasets.ImageFolder):
         tuple_with_path = (original_tuple + (path,))
         return tuple_with_path
 
-def createFolderStructure():
+def createFolderStructure(model_name):
     imageFolderName = args.imageFolderName
-    results_path = os.path.join(args.data, 'transferred_features_'+ imageFolderName, args.model)
+    results_path = os.path.join(args.data, 'transferred_features_'+ imageFolderName, model_name)
 
     data_path = os.path.join(args.data, imageFolderName)
     classFolders_list = [label \
@@ -269,114 +272,113 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
 
     return model_ft, input_size
 
-def extract_features(data_loader, model):
+def extract_features(data_loader, model, model_name):
     imageFolderName = args.imageFolderName
     # switch to evaluate mode
     model.eval()
 
     with torch.no_grad():
         for input, _, image_path in data_loader:
-            # print(input.size())
+            # print("Input size:", input.size())
             # compute output
             output_tensor = model(input.to(device))
             output_tensor = nn.AdaptiveAvgPool2d(output_size=(1, 1))(output_tensor)
             # output = output_tensor.detach().numpy()
             output = output_tensor.cpu().numpy()
             output = np.squeeze(output, axis=(2, 3))
-
+            # print("Output shape:", output.shape)
             for i in range(output.shape[0]):
                 root, image_name = os.path.split(image_path[i])
                 root, folder_name = os.path.split(root)
-                save_path = os.path.join(args.data, 'transferred_features_'+imageFolderName, args.model, folder_name)
+                save_path = os.path.join(args.data, 'transferred_features_'+imageFolderName, model_name, folder_name)
                 # print(save_path)
                 np.save(os.path.join(save_path, image_name.split('.')[0]), output[i])
 
 def main():
-    # create folders for extracted features
-    createFolderStructure()
+    for model_name in model_names:
+        print("\t Working on model:", model_name)
+        # create folders for extracted features
+        createFolderStructure(model_name)
 
-    # Initialize the model for this run
-    model_ft, input_size = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True)
-    # Print the model we just instantiated
-    print(model_ft)
-    # Send the model to GPU
-    model_ft = model_ft.to(device)
+        # Initialize the model for this run
+        model_ft, input_size = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True)
+        # Print the model we just instantiated
+        # print(model_ft)
+        # Send the model to GPU
+        model_ft = model_ft.to(device)
 
-    # Data augmentation and normalization for training
-    # Just normalization for validation
-    data_transforms = {
-        'train': transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]),
-        'val': transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]),
-    }
-
-
-    print("Initializing Datasets and Dataloaders...")
-    image_datasets = {}
-
-    # Create training and validation datasets
-    # image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
-    image_datasets['val'] = ImageFolderWithPaths(os.path.join(data_dir, args.imageFolderName), data_transforms['val'])
-    # # Create training and validation dataloaders
-    # dataloaders_dict = {
-    #     x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=(x=='train'), num_workers=4) for x in
-    #     ['train', 'val']}
-    dataloaders_dict = {
-        'val': torch.utils.data.DataLoader(image_datasets['val'], shuffle=False, batch_size=batch_size, num_workers=4)}
-    # dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-    dataset_sizes = {'val': len(image_datasets['val'])}
-    # class_names = image_datasets['train'].classes
+        # Data augmentation and normalization for training
+        # Just normalization for validation
+        data_transforms = {
+            'train': transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+            'val': transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+        }
 
 
+        print("Initializing Datasets and Dataloaders...")
+        image_datasets = {}
+
+        # Create training and validation datasets
+        # image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
+        image_datasets['val'] = ImageFolderWithPaths(os.path.join(data_dir, args.imageFolderName), data_transforms['val'])
+        # # Create training and validation dataloaders
+        # dataloaders_dict = {
+        #     x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=(x=='train'), num_workers=4) for x in
+        #     ['train', 'val']}
+        dataloaders_dict = {
+            'val': torch.utils.data.DataLoader(image_datasets['val'], shuffle=False, batch_size=batch_size, num_workers=4)}
+        # dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
+        dataset_sizes = {'val': len(image_datasets['val'])}
+        # class_names = image_datasets['train'].classes
+
+        # Gather the parameters to be optimized/updated in this run. If we are
+        #  finetuning we will be updating all parameters. However, if we are
+        #  doing feature extract method, we will only update the parameters
+        #  that we have just initialized, i.e. the parameters with requires_grad
+        #  is True.
 
 
-    # Gather the parameters to be optimized/updated in this run. If we are
-    #  finetuning we will be updating all parameters. However, if we are
-    #  doing feature extract method, we will only update the parameters
-    #  that we have just initialized, i.e. the parameters with requires_grad
-    #  is True.
+        # If training:
+        if args.train:
+            params_to_update = model_ft.parameters()
+            print("Params to learn:")
+            if feature_extract:
+                params_to_update = []
+                for name, param in model_ft.named_parameters():
+                    if param.requires_grad==True:
+                        params_to_update.append(param)
+                        print("\t", name)
+            else:
+                for name, param in model_ft.named_parameters():
+                    if param.requires_grad==True:
+                        print("\t", name)
+            # Observe that all parameters are being optimized
+            optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 
+            # Setup the loss fxn
+            criterion = nn.CrossEntropyLoss()
 
-    # If training:
-    if args.train:
-        params_to_update = model_ft.parameters()
-        print("Params to learn:")
-        if feature_extract:
-            params_to_update = []
-            for name, param in model_ft.named_parameters():
-                if param.requires_grad==True:
-                    params_to_update.append(param)
-                    print("\t", name)
+            # Train and evaluate
+            model_ft, hist = train_model(model_ft, dataloaders_dict, criterion, optimizer_ft, num_epochs=num_epochs,
+                is_inception=(model_name=="inception"))
         else:
-            for name, param in model_ft.named_parameters():
-                if param.requires_grad==True:
-                    print("\t", name)
-        # Observe that all parameters are being optimized
-        optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+            # if args.gpu is None:
+            #     model_ft.module = nn.Sequential(*list(model_ft.module.children())[:-1])
+            # else:
+            #     model_ft = nn.Sequential(*list(model_ft.children())[:-1])
 
-        # Setup the loss fxn
-        criterion = nn.CrossEntropyLoss()
-
-        # Train and evaluate
-        model_ft, hist = train_model(model_ft, dataloaders_dict, criterion, optimizer_ft, num_epochs=num_epochs,
-            is_inception=(model_name=="inception"))
-    else:
-        # if args.gpu is None:
-        #     model_ft.module = nn.Sequential(*list(model_ft.module.children())[:-1])
-        # else:
-        #     model_ft = nn.Sequential(*list(model_ft.children())[:-1])
-
-        model_ft = nn.Sequential(*list(model_ft.children())[:-1])
-        extract_features(dataloaders_dict['val'], model_ft)
+            model_ft = nn.Sequential(*list(model_ft.children())[:-1])
+            extract_features(dataloaders_dict['val'], model_ft, model_name)
 
 if __name__ == '__main__':
     main()

@@ -74,7 +74,7 @@ def get_image_features_all(paths, labels, nb_samples=None, shuffle=True):
 
     return features_support, labels_support, features_query, labels_query
 
-def get_image_features_clusters(meta_folder, sampled_labels,
+def get_image_features_clusters(nb_shot, meta_folder, sampled_labels,
             n_clusters, labels, nb_samples, shuffle=True):
     if nb_samples is not None:
         sampler = lambda x: random.sample(x, nb_samples)
@@ -88,8 +88,13 @@ def get_image_features_clusters(meta_folder, sampled_labels,
               for file in sampler(os.listdir(p))]
 
     nway = len(sampled_labels)
-    support_ids = [i for i in range(nb_samples*nway) if i%nb_samples==0]
-    query_ids = [i for i in range(nb_samples * nway) if i % nb_samples!=0]
+    #support_ids = [i for i in range(nb_samples*nway) if i%nb_samples==0]
+    #query_ids = [i for i in range(nb_samples * nway) if i % nb_samples!=0]
+    support_ids = []
+    query_ids = []
+    for i in range(nway):
+        support_ids.extend(list(range(i * nb_samples, i * nb_samples+nb_shot)))
+        query_ids.extend(list(range(i*nb_samples+nb_shot, (i+1)*nb_samples)))
     files_labels_support = [sampled_files_labels[i] for i in support_ids]
     files_labels_query = [sampled_files_labels[i] for i in query_ids]
 
@@ -119,7 +124,7 @@ def get_image_features_clusters(meta_folder, sampled_labels,
     return features_support, labels_support, features_query, labels_query
 
 
-def get_image_features_multiple(data_path, model_folders,
+def get_image_features_multiple(nb_shot, data_path, model_folders,
             sampled_labels, labels, nb_samples, shuffle=True):
     if nb_samples is not None:
         sampler = lambda x: random.sample(x, nb_samples)
@@ -132,8 +137,13 @@ def get_image_features_multiple(data_path, model_folders,
               for file in sampler(os.listdir(p))]
 
     nway = len(sampled_labels)
-    support_ids = [i for i in range(nb_samples*nway) if i%nb_samples==0]
-    query_ids = [i for i in range(nb_samples * nway) if i % nb_samples!=0]
+    support_ids = []
+    query_ids = []
+    for i in range(nway):
+        support_ids.extend(list(range(i * nb_samples, i * nb_samples+nb_shot)))
+        query_ids.extend(list(range(i*nb_samples+nb_shot, (i+1)*nb_samples)))
+    #support_ids = [i for i in range(nb_samples*nway) if i%nb_samples==0]
+    #query_ids = [i for i in range(nb_samples * nway) if i % nb_samples!=0]
     files_labels_support = [sampled_files_labels[i] for i in support_ids]
     files_labels_query = [sampled_files_labels[i] for i in query_ids]
 
