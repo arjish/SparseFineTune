@@ -126,24 +126,30 @@ def get_image_features_clusters(nb_shot, meta_folder, sampled_labels,
 
 def get_image_features_multiple(nb_shot, data_path, model_folders,
             sampled_labels, labels, nb_samples, shuffle=True):
-    if nb_samples is not None:
-        sampler = lambda x: random.sample(x, nb_samples)
-    else:
-        sampler = lambda x: x
+# Assume every folder has at least (1+nb_shot) files (Check it before).
+# That is, minimum 1 query image per class.
+    sampler = lambda x: random.sample(x, nb_samples) if len(x) > nb_samples else x
 
     folder_0 = [os.path.join(data_path, model_folders[0], item) for item in sampled_labels]
+
     sampled_files_labels = [(i, os.path.join(os.path.split(p)[-1], file)) \
               for i, p in zip(labels, folder_0) \
               for file in sampler(os.listdir(p))]
 
-    nway = len(sampled_labels)
     support_ids = []
     query_ids = []
-    for i in range(nway):
-        support_ids.extend(list(range(i * nb_samples, i * nb_samples+nb_shot)))
-        query_ids.extend(list(range(i*nb_samples+nb_shot, (i+1)*nb_samples)))
-    #support_ids = [i for i in range(nb_samples*nway) if i%nb_samples==0]
-    #query_ids = [i for i in range(nb_samples * nway) if i % nb_samples!=0]
+    current_label = 0
+    idx = 0
+    while idx < len(sampled_files_labels):
+        label, _ = sampled_files_labels[idx]
+        if label == current_label:
+            support_ids.extend(list(range(idx, idx + nb_shot)))
+            idx += nb_shot
+            current_label += 1
+        else:
+            query_ids.append(idx)
+            idx += 1
+
     files_labels_support = [sampled_files_labels[i] for i in support_ids]
     files_labels_query = [sampled_files_labels[i] for i in query_ids]
 
@@ -164,9 +170,6 @@ def get_image_features_multiple(nb_shot, data_path, model_folders,
                                                 for file in files_support]))
         features_query_list.append(np.array([np.load(os.path.join(model_path, file))
                                                 for file in files_query]))
-
-    # features_support = np.concatenate(features_support_list, axis=-1)
-    # features_query = np.concatenate(features_query_list, axis=-1)
 
     return features_support_list, labels_support, features_query_list, labels_query
 
