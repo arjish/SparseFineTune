@@ -1,5 +1,5 @@
 import numpy as np
-from utils.utils import get_image_features_multiple
+from utils.utils import get_few_features_multiple
 import os, random
 import torch
 import torch.nn as nn
@@ -142,8 +142,8 @@ def main():
         sampled_labels = random.sample(labels, nway)
 
         features_support_list, labels_support, \
-        features_query_list, labels_query = get_image_features_multiple(data_path, model_names,
-            sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
+        features_query_list, labels_query = get_few_features_multiple(data_path, model_names,
+                                                                      sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
 
         models = []
         for model_id in range(len(model_names)):

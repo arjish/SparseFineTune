@@ -1,5 +1,5 @@
 import numpy as np
-from utils.utils import get_image_features_multiple
+from utils.utils import get_all_features_multiple
 import os, random
 import torch
 import torch.nn as nn
@@ -8,10 +8,10 @@ import pickle
 
 model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
-# model_names = ['resnet18', 'resnet34']
+# model_names = ['resnet18', 'densenet121']
 
 data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
-# data_folders = ['birds']
+# data_folders = ['aircraft']
 
 features_dim_map = {
     'resnet18': 512,
@@ -30,12 +30,8 @@ count_features = dict()
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('--nway', default=5, type=int,
+parser.add_argument('--nway', default=40, type=int,
     help='number of classes')
-parser.add_argument('--kshot', default=1, type=int,
-    help='number of shots (support images per class)')
-parser.add_argument('--kquery', default=15, type=int,
-    help='number of query images per class')
 parser.add_argument('--num_epochs', default=200, type=int,
     help='number of epochs')
 parser.add_argument('--n_problems', default=50, type=int,
@@ -44,8 +40,8 @@ parser.add_argument('--lr', default=0.001, type=float,
     help='learning rate')
 parser.add_argument('--gamma', default=0.8, type=float,
     help='constant value for L2')
-parser.add_argument('--nol2', action='store_true', default=False,
-    help='set for No L2 regularization, otherwise use L2')
+parser.add_argument('--l2', action='store_true', default=False,
+    help='set for L2 regularization, otherwise no regularization')
 
 parser.add_argument('--gpu', default=0, type=int,
     help='GPU id to use.')
@@ -67,35 +63,35 @@ class ClassifierNetwork(nn.Module):
         return out
 
 
-def train_model(model, features, labels, criterion, optimizer,
-                num_epochs=50):
+def train_model(model, trainloader, criterion, optimizer,
+                num_epochs=200):
     # Train the model
-    x = torch.tensor(features, dtype=torch.float32, device=device)
-    y = torch.tensor(labels, dtype=torch.long, device=device)
+    model.train()  # Set model to training mode
     for epoch in range(num_epochs):
         # Move tensors to the configured device
-        # x = x.to(device)
-        # y = y.to(device)
+        for x, y in trainloader:
+            x = x.to(device)
+            y = y.to(device)
 
-        # Forward pass
-        outputs = model(x)
-        loss = criterion(outputs, y)
-        if not args.nol2:
-            c = torch.tensor(args.gamma, device=device)
-            l2_reg = torch.tensor(0., device=device)
-            for name, param in model.named_parameters():
-                if 'weight' in name:
-                    l2_reg += torch.norm(param)
+            # Forward pass
+            outputs = model(x)
+            loss = criterion(outputs, y)
+            if args.l2:
+                c = torch.tensor(args.gamma, device=device)
+                l2_reg = torch.tensor(0., device=device)
+                for name, param in model.named_parameters():
+                    if 'weight' in name:
+                        l2_reg += torch.norm(param)
 
-            loss += c * l2_reg
+                loss += c * l2_reg
 
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # Backward and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        # print('Epoch [{}/{}],  Loss: {:.4f}'
-        #     .format(epoch + 1, num_epochs, loss.item()))
+            # print('Epoch [{}/{}],  Loss: {:.4f}'
+            #     .format(epoch + 1, num_epochs, loss.item()))
 
 
 def get_weights(model):
@@ -113,9 +109,6 @@ def normalize(x):
 
 def main():
     nway = args.nway
-    kshot = args.kshot
-    kquery = args.kquery
-    n_img = kshot + kquery
     n_problems = args.n_problems
     num_epochs = args.num_epochs
 
@@ -124,42 +117,38 @@ def main():
         data_path = os.path.join(args.data, dataset, 'transferred_features_all')
 
         folder_0 = os.path.join(data_path, model_names[0])
-        metaval_labels = [label \
+        label_folders = [label \
                           for label in os.listdir(folder_0) \
                           if os.path.isdir(os.path.join(folder_0, label)) \
                           ]
-        labels = metaval_labels
 
         weights_normed = []
         for i in range(n_problems):
-            sampled_labels = random.sample(labels, nway)
+            sampled_label_folders = random.sample(label_folders, nway)
 
-            features_support_list, labels_support, \
-            features_query_list, labels_query = get_image_features_multiple(data_path, model_names,
-                                                                            sampled_labels, range(nway), nb_samples=n_img,
-                                                                            shuffle=True)
-            features_support = np.concatenate(features_support_list, axis=-1)
-            # features_query = np.concatenate(features_query_list, axis=-1)
+            features, labels = get_all_features_multiple(data_path, model_names,
+                                                         sampled_label_folders, range(nway))
 
-            input_size = features_support.shape[1]
-            # print('features_query.shape:', features_query.shape)
+            train_data = []
+            for i in range(features.shape[0]):
+                train_data.append([features[i], labels[i]])
+
+            input_size = features.shape[1]
+            # print('features.shape:', features.shape)
 
             model = ClassifierNetwork(input_size, nway).to(device)
+            trainloader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=200)
             # Loss and optimizer
             criterion = nn.CrossEntropyLoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-            train_model(model, features_support, labels_support, criterion, optimizer, num_epochs)
+            train_model(model, trainloader, criterion, optimizer, num_epochs)
 
             weights_normed.append(get_weights(model))
         weights_normed_mean = np.mean(weights_normed, axis=0)
         weightsL1_dict[dataset] = weights_normed_mean
 
-        with open('weightsEnsembleL1_dict_' + str(args.nway) + 'nway.pkl', 'wb') as fp:
+        with open('weightsEnsembleL1_dict_'+str(nway)+'way.pkl', 'wb') as fp:
             pickle.dump(weightsL1_dict, fp)
-
-
-
-        
 
 if __name__=='__main__':
     main()

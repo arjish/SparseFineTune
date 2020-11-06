@@ -4,7 +4,7 @@ import os, random
 import torch
 import torch.nn as nn
 import argparse
-from collections import Counter
+import pickle
 
 model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
@@ -30,7 +30,7 @@ count_features = dict()
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 
 parser.add_argument('data', help='path to dataset')
-parser.add_argument('--nway', default=5, type=int,
+parser.add_argument('--nway', default=40, type=int,
     help='number of classes')
 parser.add_argument('--kshot', default=1, type=int,
     help='number of shots (support images per class)')
@@ -119,25 +119,24 @@ def main():
     n_problems = args.n_problems
     num_epochs = args.num_epochs
 
-    weightsL1_data = []
-    top_features = []
+    weightsL1_dict = {}
     for dataset in data_folders:
         data_path = os.path.join(args.data, dataset, 'transferred_features_all')
 
         folder_0 = os.path.join(data_path, model_names[0])
-        metaval_labels = [label \
+        label_folders = [label \
                           for label in os.listdir(folder_0) \
                           if os.path.isdir(os.path.join(folder_0, label)) \
                           ]
-        labels = metaval_labels
+        random.shuffle(label_folders)
 
         weights_normed = []
         for i in range(n_problems):
-            sampled_labels = random.sample(labels, nway)
+            sampled_label_folders = random.sample(label_folders, nway)
 
             features_support_list, labels_support, \
-            features_query_list, labels_query = get_few_features_multiple(data_path, model_names,
-                                                                          sampled_labels, range(nway), nb_samples=n_img,
+            features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
+                                                                          sampled_label_folders, range(nway), nb_samples=n_img,
                                                                           shuffle=True)
             features_support = np.concatenate(features_support_list, axis=-1)
             # features_query = np.concatenate(features_query_list, axis=-1)
@@ -153,30 +152,10 @@ def main():
 
             weights_normed.append(get_weights(model))
         weights_normed_mean = np.mean(weights_normed, axis=0)
-        n_top_features = int(input_size * 0.1)
+        weightsL1_dict[dataset] = weights_normed_mean
 
-        # print('weights_normed_mean shape:', weights_normed_mean.shape)
-
-        avg_per_model = []
-        start_idx = 0
-        backbone_weight_list = []
-        for idx, model_name in enumerate(model_names):
-            length = features_dim_map[model_name]
-            current_weights = weights_normed_mean[start_idx: start_idx+length]
-            # avg_per_model.append(np.mean(current_weights))
-            backbone_weight_list.extend([(idx, item) for item in current_weights])
-            start_idx = start_idx+length
-        # weightsL1_data.append(avg_per_model)
-
-        top_backbones = sorted(backbone_weight_list, key=lambda x: x[1], reverse=True)[:n_top_features]
-        top_backbones = [item[0] for item in top_backbones]
-        top_features.append(Counter(top_backbones))
-
-    # weightsL1_data = [normalize(i) for i in weightsL1_data]
-    # print(weightsL1_data)
-    print(top_features)
-    # np.save('weightsL1_data', weightsL1_data)
-    np.save('top_features'+str(nway)+'way', top_features)
+        with open('weightsEnsembleL1_dict_'+str(kshot)+'shot'+str(nway)+'way.pkl', 'wb') as fp:
+            pickle.dump(weightsL1_dict, fp)
 
 
 

@@ -124,8 +124,8 @@ def get_image_features_clusters(nb_shot, meta_folder, sampled_labels,
     return features_support, labels_support, features_query, labels_query
 
 
-def get_image_features_multiple(nb_shot, data_path, model_folders,
-            sampled_labels, labels, nb_samples, shuffle=True):
+def get_few_features_multiple(nb_shot, data_path, model_folders,
+                              sampled_labels, labels, nb_samples, shuffle=True):
 # Assume every folder has at least (1+nb_shot) files (Check it before).
 # That is, minimum 1 query image per class.
     sampler = lambda x: random.sample(x, nb_samples) if len(x) > nb_samples else x
@@ -172,6 +172,30 @@ def get_image_features_multiple(nb_shot, data_path, model_folders,
                                                 for file in files_query]))
 
     return features_support_list, labels_support, features_query_list, labels_query
+
+
+def get_all_features_multiple(data_path, model_folders,
+                              class_labels, label_ids):
+
+    folder_0 = [os.path.join(data_path, model_folders[0], item) for item in class_labels]
+
+    files_labels = [(i, os.path.join(os.path.split(p)[-1], file)) \
+                    for i, p in zip(label_ids, folder_0) \
+                    for file in os.listdir(p)]
+
+
+    labels = [fl[0] for fl in files_labels]
+    files = [fl[1] for fl in files_labels]
+
+    features = []
+    for model in model_folders:
+        model_path = os.path.join(data_path, model)
+        features.append(np.array([np.load(os.path.join(model_path, file))
+                                                for file in files]))
+    features = np.concatenate(features, axis=-1)
+
+    return features, labels
+
 
 # For matchingNet and RelationalNet:
 def one_hot(y, num_class):

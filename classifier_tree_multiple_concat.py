@@ -1,5 +1,5 @@
 import numpy as np
-from utils.utils import get_image_features_multiple
+from utils.utils import get_few_features_multiple
 import os, random
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -74,8 +74,8 @@ def main():
         sampled_labels = random.sample(labels, nway)
 
         features_support_list, labels_support, \
-        features_query_list, labels_query = get_image_features_multiple(data_path, model_names,
-            sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
+        features_query_list, labels_query = get_few_features_multiple(data_path, model_names,
+                                                                      sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
         features_support = np.concatenate(features_support_list, axis=-1)
         features_query = np.concatenate(features_query_list, axis=-1)
         # print('features_query.shape:', features_query.shape)
