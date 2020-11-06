@@ -4,11 +4,7 @@ import os, random
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-# from math import ceil
-# import torchvision
-# import torchvision.transforms as transforms
 import argparse
-# from copy import deepcopy
 
 data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
 # data_folders = ['aircraft']
@@ -68,7 +64,7 @@ class ClassifierNetwork(nn.Module):
 
 
 def train_model(model, trainloader, features_fewshot, labels_fewshot,
-                criterion, optimizer, optimizer_regularizer, r_tensor, epoch):
+                criterion, optimizer, optimizer_regularizer, r_tensor, epoch, dataset):
     # Train the model
     x_fewshot = torch.tensor(features_fewshot, dtype=torch.float32, device=device)
     y_fewshot = torch.tensor(labels_fewshot, dtype=torch.long, device=device)
@@ -98,23 +94,23 @@ def train_model(model, trainloader, features_fewshot, labels_fewshot,
         loss.backward()
         optimizer.step()
 
-    # model_fewshot = deepcopy(model)
-    output_fewshot = model(x_fewshot)  # copy the model parameters and not use the same ones
-    params = torch.cat([torch.flatten(param) for param in param_list], dim =0)
-    grads_big = torch.cat([torch.flatten(param.grad) for param in param_list], dim=0)
-    # grads_big = [param.grad for param in param_list]
-    loss_fewshot = criterion(output_fewshot, y_fewshot) + torch.dot(r_tensor, torch.square(params))
-    loss_fewshot.backward(create_graph=True)
-    grads_small = torch.cat([torch.flatten(param.grad) for param in list(model.parameters())], dim=0)
-    # grads_small = [param.grad for param in list(model.parameters())]
+        # model_fewshot = deepcopy(model)
+        output_fewshot = model(x_fewshot)  # copy the model parameters and not use the same ones
+        params = torch.cat([torch.flatten(param) for param in param_list], dim =0)
+        grads_big = torch.cat([torch.flatten(param.grad) for param in param_list], dim=0)
+        # grads_big = [param.grad for param in param_list]
+        loss_fewshot = criterion(output_fewshot, y_fewshot) + torch.dot(r_tensor, torch.square(params))
+        loss_fewshot.backward(create_graph=True)
+        grads_small = torch.cat([torch.flatten(param.grad) for param in list(model.parameters())], dim=0)
+        # grads_small = [param.grad for param in list(model.parameters())]
 
-    torch.autograd.set_detect_anomaly(True)
-    output_regularizer = grads_small
-    target_regularizer = grads_big
-    loss_regularizer = torch.nn.MSELoss()(output_regularizer, target_regularizer)
+        torch.autograd.set_detect_anomaly(True)
+        output_regularizer = grads_small
+        target_regularizer = grads_big
+        loss_regularizer = torch.nn.MSELoss()(output_regularizer, target_regularizer)
     if epoch % 10 == 0:
-        print("\t\t\tEpoch:", epoch, "Loss", loss_regularizer.data.cpu().numpy().item())
-        # print("\t\t\tEpoch:", epoch, "Loss", loss_regularizer.data)
+        # print("Epoch:", epoch, "Classification loss", loss.data.cpu().numpy().item())
+        print("\t\t", dataset, "Epoch:", epoch, "\t\tLoss", loss_regularizer.data.cpu().numpy().item())
 
     optimizer_regularizer.zero_grad()
     loss_regularizer.backward()
@@ -171,7 +167,7 @@ def main():
     else:
         # dtype = torch.cuda.FloatTensor
         r_tensor = Variable(torch.from_numpy(r).cuda(), requires_grad=True)
-    optimizer_regularizer = torch.optim.Adam([r_tensor], lr=0.01)
+    optimizer_regularizer = torch.optim.Adam([r_tensor], lr=0.05)
 
     # Full data training:
     criterion = nn.CrossEntropyLoss()
@@ -180,28 +176,26 @@ def main():
         print('Problem num:', prob)
         for epoch in range(num_epochs):
             for idx, dataset in enumerate(data_folders):
-                if epoch % 10 == 0:
-                    print('\tDataset:', dataset)
-                data_path = os.path.join(args.data, dataset, 'transferred_features_all')
-                folder_0 = os.path.join(data_path, model_names[0])
-                label_folders = [label \
-                                 for label in os.listdir(folder_0) \
-                                 if os.path.isdir(os.path.join(folder_0, label)) \
-                                 ]
-                sampled_label_folders = random.sample(label_folders, nway)
+                if epoch == 0:
+                    data_path = os.path.join(args.data, dataset, 'transferred_features_all')
+                    folder_0 = os.path.join(data_path, model_names[0])
+                    label_folders = [label \
+                                     for label in os.listdir(folder_0) \
+                                     if os.path.isdir(os.path.join(folder_0, label)) \
+                                     ]
+                    sampled_label_folders = random.sample(label_folders, nway)
 
-                features_support_list, labels_support, \
-                        features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
-                                                                                      sampled_label_folders, range(nway), nb_samples=n_img, shuffle=True)
-                features_support = np.concatenate(features_support_list, axis=-1)
+                    features_support_list, labels_support, \
+                            features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
+                                                                                          sampled_label_folders, range(nway), nb_samples=n_img, shuffle=True)
+                    features_support = np.concatenate(features_support_list, axis=-1)
 
                 # train one epoch
                 r_tensor = train_model(models[idx], trainloaders[idx], features_support, labels_support,
-                                criterion, optimizers[idx], optimizer_regularizer, r_tensor, epoch)
+                                criterion, optimizers[idx], optimizer_regularizer, r_tensor, epoch, dataset)
 
-    np.save('regularizer_weights', r_tensor.cpu().detach().numpy())
-
-
+                if prob % 10 == 0:
+                    np.save('regularizer_weights', r_tensor.cpu().detach().numpy())
 
 if __name__=='__main__':
     main()
