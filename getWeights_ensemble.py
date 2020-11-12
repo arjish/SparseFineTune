@@ -10,8 +10,8 @@ model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
 # model_names = ['resnet18', 'densenet121']
 
-data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
-# data_folders = ['aircraft']
+# data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
+data_folders = ['quick_draw', 'vgg_flower', 'fungi']
 
 features_dim_map = {
     'resnet18': 512,
@@ -114,6 +114,7 @@ def main():
 
     weightsL1_dict = {}
     for dataset in data_folders:
+        print("Working on datase:", dataset)
         data_path = os.path.join(args.data, dataset, 'transferred_features_all')
 
         folder_0 = os.path.join(data_path, model_names[0])
@@ -124,6 +125,7 @@ def main():
 
         weights_normed = []
         for i in range(n_problems):
+            print("\t\tProblem num:", i)
             sampled_label_folders = random.sample(label_folders, nway)
 
             features, labels = get_all_features_multiple(data_path, model_names,
@@ -147,7 +149,13 @@ def main():
         weights_normed_mean = np.mean(weights_normed, axis=0)
         weightsL1_dict[dataset] = weights_normed_mean
 
-        with open('weightsEnsembleL1_dict_'+str(nway)+'way.pkl', 'wb') as fp:
+        weights_dict_file = 'weightsEnsembleL1_dict_'+str(nway)+'way.pkl'
+        if os.path.exists(weights_dict_file):
+            with open(weights_dict_file, 'rb') as fp:
+                weightsL1_dict_prev = pickle.load(fp)
+            weightsL1_dict = {**weightsL1_dict, **weightsL1_dict_prev}
+
+        with open(weights_dict_file, 'wb') as fp:
             pickle.dump(weightsL1_dict, fp)
 
 if __name__=='__main__':

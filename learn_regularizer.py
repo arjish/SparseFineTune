@@ -22,7 +22,7 @@ parser.add_argument('--kquery', default=15, type=int,
     help='number of query images per class')
 parser.add_argument('--num_epochs', default=100, type=int,
     help='number of epochs')
-parser.add_argument('--n_problems', default=600, type=int,
+parser.add_argument('--n_problems', default=60000, type=int,
     help='number of test problems')
 parser.add_argument('--hidden_size1', default=1024, type=int,
     help='hidden layer size')
@@ -34,6 +34,10 @@ parser.add_argument('--gamma', default=0.5, type=float,
     help='constant value for L2')
 parser.add_argument('--linear', action='store_true', default=False,
     help='set for linear model, otherwise use hidden layer')
+parser.add_argument('--reg_file', default='regularizer_weights_cosine.npy',
+    help='mse or cosine')
+parser.add_argument('--reg_loss', default='cosine',
+    help='mse or cosine')
 
 parser.add_argument('--gpu', default=0, type=int,
     help='GPU id to use.')
@@ -42,6 +46,8 @@ args = parser.parse_args()
 
 # Device configuration
 device = torch.device("cuda:"+str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
 
 # Fully connected neural network with one hidden layer
@@ -99,7 +105,7 @@ def train_model(model, trainloader, features_fewshot, labels_fewshot,
         params = torch.cat([torch.flatten(param) for param in param_list], dim =0)
         grads_big = torch.cat([torch.flatten(param.grad) for param in param_list], dim=0)
         # grads_big = [param.grad for param in param_list]
-        loss_fewshot = criterion(output_fewshot, y_fewshot) + torch.dot(r_tensor, torch.square(params))
+        loss_fewshot = criterion(output_fewshot, y_fewshot) + torch.dot(torch.square(r_tensor), params)
         loss_fewshot.backward(create_graph=True)
         grads_small = torch.cat([torch.flatten(param.grad) for param in list(model.parameters())], dim=0)
         # grads_small = [param.grad for param in list(model.parameters())]
@@ -107,7 +113,12 @@ def train_model(model, trainloader, features_fewshot, labels_fewshot,
         torch.autograd.set_detect_anomaly(True)
         output_regularizer = grads_small
         target_regularizer = grads_big
-        loss_regularizer = torch.nn.MSELoss()(output_regularizer, target_regularizer)
+
+        if args.reg_loss == "cosine":
+            loss_regularizer = -torch.nn.CosineSimilarity(dim=0)(output_regularizer, target_regularizer)
+        else:
+            loss_regularizer = torch.nn.MSELoss()(output_regularizer, target_regularizer)
+
     if epoch % 10 == 0:
         # print("Epoch:", epoch, "Classification loss", loss.data.cpu().numpy().item())
         print("\t\t", dataset, "Epoch:", epoch, "\t\tLoss", loss_regularizer.data.cpu().numpy().item())
@@ -157,8 +168,10 @@ def main():
     # to get the model parameter size:
     num_params = sum([param.numel() for param in list(models[0].parameters())])
 
-    if os.path.exists("regularizer_weights.npy"):
-        r = np.load("regularizer_weights.npy")
+    regularizer_file = args.reg_file
+    print("Using regularizer file:", regularizer_file)
+    if os.path.exists(regularizer_file):
+        r = np.load(regularizer_file)
     else:
         r = np.random.normal(0, 0.1, num_params).astype(np.float32)
     if device.type == "cpu":
@@ -167,35 +180,33 @@ def main():
     else:
         # dtype = torch.cuda.FloatTensor
         r_tensor = Variable(torch.from_numpy(r).cuda(), requires_grad=True)
-    optimizer_regularizer = torch.optim.Adam([r_tensor], lr=0.05)
+    optimizer_regularizer = torch.optim.Adam([r_tensor], lr=0.1)
 
     # Full data training:
     criterion = nn.CrossEntropyLoss()
 
     for prob in range(n_problems):
-        print('Problem num:', prob)
-        for epoch in range(num_epochs):
-            for idx, dataset in enumerate(data_folders):
-                if epoch == 0:
-                    data_path = os.path.join(args.data, dataset, 'transferred_features_all')
-                    folder_0 = os.path.join(data_path, model_names[0])
-                    label_folders = [label \
-                                     for label in os.listdir(folder_0) \
-                                     if os.path.isdir(os.path.join(folder_0, label)) \
-                                     ]
-                    sampled_label_folders = random.sample(label_folders, nway)
+        # print('Problem num:', prob)
+        for idx, dataset in enumerate(data_folders):
+            data_path = os.path.join(args.data, dataset, 'transferred_features_all')
+            folder_0 = os.path.join(data_path, model_names[0])
+            label_folders = [label \
+                             for label in os.listdir(folder_0) \
+                             if os.path.isdir(os.path.join(folder_0, label)) \
+                             ]
+            sampled_label_folders = random.sample(label_folders, nway)
 
-                    features_support_list, labels_support, \
-                            features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
-                                                                                          sampled_label_folders, range(nway), nb_samples=n_img, shuffle=True)
-                    features_support = np.concatenate(features_support_list, axis=-1)
+            features_support_list, labels_support, \
+                    features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
+                                                                                  sampled_label_folders, range(nway), nb_samples=n_img, shuffle=True)
+            features_support = np.concatenate(features_support_list, axis=-1)
 
-                # train one epoch
-                r_tensor = train_model(models[idx], trainloaders[idx], features_support, labels_support,
-                                criterion, optimizers[idx], optimizer_regularizer, r_tensor, epoch, dataset)
+            # train one epoch per problem, i.e., problem id is epoch id.
+            r_tensor = train_model(models[idx], trainloaders[idx], features_support, labels_support,
+                            criterion, optimizers[idx], optimizer_regularizer, r_tensor, prob, dataset)
 
-                if prob % 10 == 0:
-                    np.save('regularizer_weights', r_tensor.cpu().detach().numpy())
+            if prob % 10 == 0:
+                np.save(regularizer_file, r_tensor.cpu().detach().numpy())
 
 if __name__=='__main__':
     main()

@@ -1,3 +1,10 @@
+import os
+from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file
+
+params = parse_args('test')
+os.environ['CUDA_VISIBLE_DEVICES'] = str(params.gpu)
+
+
 import torch
 import numpy as np
 from torch.autograd import Variable
@@ -5,7 +12,6 @@ import torch.nn as nn
 import torch.optim
 import json
 import torch.utils.data.sampler
-import os
 import glob
 import random
 import time
@@ -20,7 +26,7 @@ from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
-from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
+#from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
 
 def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 15, adaptation = False):
     class_list = cl_data_file.keys()
@@ -45,7 +51,9 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
     return acc
 
 if __name__ == '__main__':
-    params = parse_args('test')
+    # params = parse_args('test')
+    # Device configuration
+    # device = torch.device("cuda:"+str(params.gpu) if torch.cuda.is_available() else "cpu")
 
     acc_all = []
 
@@ -96,7 +104,7 @@ if __name__ == '__main__':
         checkpoint_dir += '_aug'
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
-
+    print("Checkpoint:", checkpoint_dir)
     #modelfile   = get_resume_file(checkpoint_dir)
 
     if not params.method in ['baseline', 'baseline++'] : 
@@ -107,6 +115,7 @@ if __name__ == '__main__':
         if modelfile is not None:
             tmp = torch.load(modelfile)
             model.load_state_dict(tmp['state'])
+        print("Model file:", modelfile)
 
     split = params.split
     if params.save_iter != -1:

@@ -10,7 +10,8 @@ model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
 # model_names = ['resnet18', 'resnet34']
 
-data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
+data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',
+                'traffic_sign', 'quick_draw', 'vgg_flower', 'fungi']
 
 features_dim_map = {
     'resnet18': 512,
@@ -85,7 +86,7 @@ def get_jaccard_among_datasets():
     with open('jaccard_scores_ensemble_'+str(args.nway)+'way.pkl', 'wb') as fp:
         pickle.dump(jaccard_scores, fp)
 
-def get_pearson_coeff():
+def get_pearson_coeff_among_datasets():
     n_datasets = len(data_folders)
     pearson_scores = []
 
@@ -151,7 +152,10 @@ def get_pearson_coeff_fewVsAll():
         pickle.dump(pearson_scores, fp)
 
 def main():
-    get_pearson_coeff()
+    get_pearson_coeff_among_datasets()
+    get_jaccard_among_datasets()
+    get_pearson_coeff_fewVsAll()
+    get_jaccard_fewVsAll()
 
 if __name__=='__main__':
     main()

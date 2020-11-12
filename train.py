@@ -104,8 +104,8 @@ if __name__=='__main__':
         val_datamgr     = SimpleDataManager(image_size, batch_size = 64)
         val_loader      = val_datamgr.get_data_loader( val_file, aug = False)
         
-        if params.dataset == 'omniglot':
-            assert params.num_classes >= 4112, 'class number need to be larger than max label id in base class'
+        if params.dataset == 'omniglot':	#4112 with rotation
+            assert params.num_classes >= 1200, 'class number need to be larger than max label id in base class'
         if params.dataset == 'cross_char':
             assert params.num_classes >= 1597, 'class number need to be larger than max label id in base class'
 
@@ -115,7 +115,7 @@ if __name__=='__main__':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
     elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx']:
-        n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
+        n_query = max(1, int(15* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
  
         train_few_shot_params    = dict(n_way = params.train_n_way, n_support = params.n_shot) 
         base_datamgr            = SetDataManager(image_size, n_query = n_query,  **train_few_shot_params)
@@ -175,7 +175,7 @@ if __name__=='__main__':
         resume_file = get_resume_file(params.checkpoint_dir)
         if resume_file is not None:
             tmp = torch.load(resume_file)
-            # tmp = torch.jit.load(resume_file)
+            #tmp = torch.jit.load(resume_file)
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
     elif params.warmup: #We also support warmup from pretrained baseline feature, but we never used in our paper

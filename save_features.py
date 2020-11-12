@@ -1,7 +1,13 @@
+import os
+from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file
+
+params = parse_args('save_features')
+os.environ['CUDA_VISIBLE_DEVICES'] = str(params.gpu)
+
+
 import numpy as np
 import torch
 from torch.autograd import Variable
-import os
 import glob
 import h5py
 
@@ -14,7 +20,7 @@ from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
-from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
+#from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
 
 
 def save_features(model, data_loader, outfile ):
@@ -41,7 +47,9 @@ def save_features(model, data_loader, outfile ):
     f.close()
 
 if __name__ == '__main__':
-    params = parse_args('save_features')
+    #params = parse_args('save_features')
+    # Device configuration
+    #device = torch.device("cuda:"+str(params.gpu) if torch.cuda.is_available() else "cpu")
     assert params.method != 'maml' and params.method != 'maml_approx', 'maml do not support save_feature and run'
 
     if 'Conv' in params.model:

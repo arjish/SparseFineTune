@@ -7,35 +7,23 @@ import random
 
 cwd = os.getcwd() 
 
-train_path = join(cwd,'train')
-val_path = join(cwd,'val')
-test_path = join(cwd,'test')
+#train_path = join(cwd,'train')
+#val_path = join(cwd,'val')
+test_path = join(cwd,'all')
 
 savedir = './'
-dataset_list = ['base','novel']
+dataset_list = ['novel']
 
 #if not os.path.exists(savedir):
 #    os.makedirs(savedir)
 
-folder_list_train = [f for f in listdir(train_path) if isdir(join(train_path, f))]
-#folder_list_val = [f for f in listdir(val_path) if isdir(join(val_path, f))]
 folder_list_test = [f for f in listdir(test_path) if isdir(join(test_path, f))]
 
-folder_list = [folder for folder in folder_list_train]
-#folder_list.append(folder_list_val)
-folder_list.append(folder_list_test)
+folder_list = [folder for folder in folder_list_test]
+# label_dict_train = dict(zip(folder_list,range(0,len(folder_list))))
 
 classfile_list_train, classfile_list_val, classfile_list_test = [], [], []
 
-for i, folder in enumerate(folder_list_train):
-    folder_path = join(train_path, folder)
-    classfile_list_train.append( [ join(folder_path, cf) for cf in listdir(folder_path) if (isfile(join(folder_path,cf)) and cf[0] != '.')])
-    random.shuffle(classfile_list_train[i])
-
-#for i, folder in enumerate(folder_list_val):
-#    folder_path = join(val_path, folder)
-#    classfile_list_val.append( [ join(folder_path, cf) for cf in listdir(folder_path) if (isfile(join(folder_path,cf)) and cf[0] != '.')])
-#    random.shuffle(classfile_list_val[i])
 
 for i, folder in enumerate(folder_list_test):
     folder_path = join(test_path, folder)
@@ -81,4 +69,3 @@ for dataset in dataset_list:
 
     fo.close()
     print("%s -OK" %dataset)
-
