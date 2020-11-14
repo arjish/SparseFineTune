@@ -10,8 +10,8 @@ model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
 # model_names = ['resnet18', 'resnet34']
 
-# data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
-data_folders = ['quick_draw', 'vgg_flower', 'fungi']
+data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign',
+                'quick_draw', 'vgg_flower', 'fungi']
 
 features_dim_map = {
     'resnet18': 512,
@@ -138,8 +138,8 @@ def main():
 
             features_support_list, labels_support, \
             features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
-                                                                          sampled_label_folders, range(nway), nb_samples=n_img,
-                                                                          shuffle=True)
+                                              sampled_label_folders, range(nway), nb_samples=n_img,
+                                              shuffle=True)
             features_support = np.concatenate(features_support_list, axis=-1)
             # features_query = np.concatenate(features_query_list, axis=-1)
 
@@ -156,7 +156,10 @@ def main():
         weights_normed_mean = np.mean(weights_normed, axis=0)
         weightsL1_dict[dataset] = weights_normed_mean
 
-        weights_dict_file = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way.pkl'
+        if args.nol2:
+            weights_dict_file = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way_noL2.pkl'
+        else:
+            weights_dict_file = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way.pkl'
         if os.path.exists(weights_dict_file):
             with open(weights_dict_file, 'rb') as fp:
                 weightsL1_dict_prev = pickle.load(fp)

@@ -3,12 +3,10 @@ from utils.utils import get_few_features_multiple
 import os, random
 import torch
 import torch.nn as nn
-from math import ceil
-import torchvision
-import torchvision.transforms as transforms
 import argparse
 
-model_names = ['resnet18', 'alexnet', 'vgg11_bn', 'squeezenet1_0', 'densenet121']
+model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+               'densenet121', 'densenet161', 'densenet169', 'densenet201']
 
 parser = argparse.ArgumentParser(description='Finetune Classifier')
 parser.add_argument('data', help='path to dataset')
@@ -22,13 +20,13 @@ parser.add_argument('--kshot', default=1, type=int,
     help='number of shots (support images per class)')
 parser.add_argument('--kquery', default=15, type=int,
     help='number of query images per class')
-parser.add_argument('--num_epochs', default=50, type=int,
+parser.add_argument('--num_epochs', default=100, type=int,
     help='number of epochs')
 parser.add_argument('--n_problems', default=600, type=int,
     help='number of test problems')
-parser.add_argument('--hidden_size', default=32, type=int,
+parser.add_argument('--hidden_size', default=512, type=int,
     help='hidden layer size')
-parser.add_argument('--gamma', default=0.5, type=float,
+parser.add_argument('--gamma', default=0.001, type=float,
     help='constant value for L2')
 parser.add_argument('--linear', action='store_true', default=False,
     help='set for linear model, otherwise use hidden layer')
@@ -126,7 +124,7 @@ def main():
     domain_type = args.domain_type
 
     if domain_type=='cross':
-        data_path = os.path.join(data, 'transferred_features_val')
+        data_path = os.path.join(data, 'transferred_features_all')
     else:
         data_path = os.path.join(data, 'features_test')
 
@@ -139,11 +137,11 @@ def main():
 
     accs = []
     for i in range(n_problems):
-        sampled_labels = random.sample(labels, nway)
+        sampled_label_folders = random.sample(labels, nway)
 
         features_support_list, labels_support, \
-        features_query_list, labels_query = get_few_features_multiple(data_path, model_names,
-                                                                      sampled_labels, range(nway), nb_samples=n_img, shuffle=True)
+        features_query_list, labels_query = get_few_features_multiple(kshot, data_path, model_names,
+                              sampled_label_folders, range(nway), nb_samples=n_img, shuffle=True)
 
         models = []
         for model_id in range(len(model_names)):
@@ -154,7 +152,8 @@ def main():
             # Loss and optimizer
             criterion = nn.CrossEntropyLoss()
             optimizer = torch.optim.Adam(models[model_id].parameters(), lr=0.01)
-            train_model(models[model_id], features_support_list[model_id], labels_support, criterion, optimizer, num_epochs)
+            train_model(models[model_id], features_support_list[model_id], labels_support,
+                        criterion, optimizer, num_epochs)
 
         accuracy_test = test_model(models, features_query_list, labels_query)
 

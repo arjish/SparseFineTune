@@ -10,8 +10,10 @@ model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
 # model_names = ['resnet18', 'densenet121']
 
-# data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign']
-data_folders = ['quick_draw', 'vgg_flower', 'fungi']
+# data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',  'traffic_sign',
+# 'quick_draw', 'vgg_flower', 'fungi']
+
+data_folders = ['aircraft']
 
 features_dim_map = {
     'resnet18': 512,
@@ -136,7 +138,7 @@ def main():
                 train_data.append([features[i], labels[i]])
 
             input_size = features.shape[1]
-            # print('features.shape:', features.shape)
+            print('features.shape:', features.shape)
 
             model = ClassifierNetwork(input_size, nway).to(device)
             trainloader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=200)

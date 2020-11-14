@@ -31,6 +31,8 @@ parser.add_argument('--nway', default=40, type=int,
     help='number of classes')
 parser.add_argument('--kshot', default=1, type=int,
     help='number of shots (support images per class)')
+parser.add_argument('--nol2', action='store_true', default=False,
+    help='set for No L2 regularization, otherwise use L2')
 
 args = parser.parse_args()
 nway = args.nway
@@ -106,7 +108,15 @@ def get_pearson_coeff_among_datasets():
         pickle.dump(pearson_scores, fp)
 
 def get_jaccard_fewVsAll():
-    weights_fewshot_pkl = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way.pkl'
+    if args.nol2:
+        weights_fewshot_pkl = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way_noL2.pkl'
+        txt_file = 'jaccard_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way_noL2.txt'
+        pkl_file = 'jaccard_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way_noL2.pkl'
+    else:
+        weights_fewshot_pkl = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way.pkl'
+        txt_file = 'jaccard_scores_ensemble_fewVsAll_' + str(kshot) + 'shot' + str(args.nway) + 'way.txt'
+        pkl_file = 'jaccard_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way.pkl'
+
     if os.path.exists(weights_fewshot_pkl):
         with open(weights_fewshot_pkl, 'rb') as fp:
             weightsL1_fewshot_dict = pickle.load(fp)
@@ -115,7 +125,7 @@ def get_jaccard_fewVsAll():
     n_datasets = len(data_folders)
     jaccard_scores = []
 
-    fp = open('jaccard_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way.txt', 'w')
+    fp = open(txt_file, 'w')
     n_top_features = int(sum(list(features_dim_map.values())) * 0.2)
     for idx in range(n_datasets):
         top_features_1 = np.argsort(weightsL1_dict[data_folders[idx]])[::-1][:n_top_features]
@@ -125,11 +135,19 @@ def get_jaccard_fewVsAll():
         fp.write(data_folders[idx] + ": " + str(score) + "\n")
 
     fp.close()
-    with open('jaccard_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way.pkl', 'wb') as fp:
+    with open(pkl_file, 'wb') as fp:
         pickle.dump(jaccard_scores, fp)
 
 def get_pearson_coeff_fewVsAll():
-    weights_fewshot_pkl = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way.pkl'
+    if args.nol2:
+        weights_fewshot_pkl = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way_noL2.pkl'
+        txt_file = 'pearson_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way_noL2.txt'
+        pkl_file = 'pearson_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way_noL2.pkl'
+    else:
+        weights_fewshot_pkl = 'weightsEnsembleL1_dict_' + str(kshot) + 'shot' + str(nway) + 'way.pkl'
+        txt_file = 'pearson_scores_ensemble_fewVsAll_' + str(kshot) + 'shot' + str(args.nway) + 'way.txt'
+        pkl_file = 'pearson_scores_ensemble_fewVsAll_'+str(kshot) + 'shot' + str(args.nway) + 'way.pkl'
+
     if os.path.exists(weights_fewshot_pkl):
         with open(weights_fewshot_pkl, 'rb') as fp:
             weightsL1_fewshot_dict = pickle.load(fp)
@@ -138,7 +156,7 @@ def get_pearson_coeff_fewVsAll():
     n_datasets = len(data_folders)
     pearson_scores = []
 
-    fp = open('pearson_scores_ensemble_fewVsAll_' + str(kshot) + 'shot' + str(args.nway) + 'way.txt', 'w')
+    fp = open(txt_file, 'w')
     for idx in range(n_datasets):
         features_1 = weightsL1_dict[data_folders[idx]]
         features_2 = weightsL1_fewshot_dict[data_folders[idx]]
@@ -148,12 +166,12 @@ def get_pearson_coeff_fewVsAll():
         fp.write(data_folders[idx] + ": " + str(score) + "\n")
     fp.close()
 
-    with open('pearson_scores_ensemble_fewVsAll_' + str(kshot) + 'shot' + str(args.nway) + 'way.pkl', 'wb') as fp:
+    with open(pkl_file, 'wb') as fp:
         pickle.dump(pearson_scores, fp)
 
 def main():
-    get_pearson_coeff_among_datasets()
-    get_jaccard_among_datasets()
+    # get_pearson_coeff_among_datasets()
+    # get_jaccard_among_datasets()
     get_pearson_coeff_fewVsAll()
     get_jaccard_fewVsAll()
 

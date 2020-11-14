@@ -2,14 +2,17 @@ import numpy as np
 from os import listdir
 from os.path import isfile, isdir, join
 import os
-import json
+import argparse
 import random
 
-cwd = os.getcwd() 
+parser = argparse.ArgumentParser(description='Write filelist')
+parser.add_argument('dataset', help='name of the dataset')
+parser.add_argument('--datapath', default="../../../data/",
+                    help='parent path to the data')
+args = parser.parse_args()
 
-#train_path = join(cwd,'train')
-#val_path = join(cwd,'val')
-test_path = join(cwd,'all')
+data_path = os.path.abspath(args.datapath)
+test_path = join(data_path, args.dataset, 'all')
 
 savedir = './'
 dataset_list = ['novel']
