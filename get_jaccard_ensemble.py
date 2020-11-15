@@ -1,14 +1,14 @@
 import numpy as np
-from collections import defaultdict
 import os
 import argparse
 import pickle
 from sklearn.metrics import jaccard_score
 from scipy.stats.stats import pearsonr
+from collections import defaultdict
+
 
 model_names = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
                'densenet121', 'densenet161', 'densenet169', 'densenet201']
-# model_names = ['resnet18', 'resnet34']
 
 data_folders = ['birds', 'aircraft', 'fc100',  'omniglot',  'texture',
                 'traffic_sign', 'quick_draw', 'vgg_flower', 'fungi']
@@ -24,6 +24,13 @@ features_dim_map = {
     'densenet169': 1664,
     'densenet201': 1920
 }
+
+star_end_idx = {}
+start = 0
+for k, v in features_dim_map.items():
+    end = start + v
+    star_end_idx[k] = (start, end)
+    start = end
 
 parser = argparse.ArgumentParser(description='Get Jaccard Index')
 
@@ -41,7 +48,10 @@ kshot = args.kshot
 def jaccard_similarity(list1, list2):
     s1 = set(list1)
     s2 = set(list2)
-    return round(len(s1.intersection(s2)) / len(s1.union(s2)), 3)
+    if  len(s1.union(s2)) ==  0:
+        return 0
+    else:
+        return round(len(s1.intersection(s2)) / len(s1.union(s2)), 3)
 
 def jaccard_index_null (list1, list2, n_features):
     n1 = len(list1)
@@ -66,17 +76,6 @@ def get_jaccard_among_datasets():
     n_top_features = int(sum(list(features_dim_map.values())) * 0.2)
     for idx1 in range(n_datasets-1):
         for idx2 in range(idx1+1, n_datasets):
-            #The order of the backbones have to be fixed!!
-            # for model_idx, backbone in enumerate(model_names):
-            #     n_top_features = int(features_dim_map[backbone] * 0.2)
-            #     top_features_1 = np.argsort(weightsL1_dict[data_folders[idx1]][model_idx])[::-1][:n_top_features]
-            #     top_features_2 = np.argsort(weightsL1_dict[data_folders[idx2]][model_idx])[::-1][:n_top_features]
-            #     score = jaccard_similarity(top_features_1, top_features_2)
-            #     score_null = jaccard_index_null(top_features_1, top_features_2, features_dim_map[backbone])
-            #     jaccard_scores[backbone].append((score, score_null))
-            #     fp.write(backbone + ": " + data_folders[idx1] + ", " + data_folders[idx2]
-            #              + ": " + str(score) + ", " + str(score_null) + "\n")
-
             top_features_1 = np.argsort(weightsL1_dict[data_folders[idx1]])[::-1][:n_top_features]
             top_features_2 = np.argsort(weightsL1_dict[data_folders[idx2]])[::-1][:n_top_features]
             score = jaccard_similarity(top_features_1, top_features_2)
@@ -106,6 +105,55 @@ def get_pearson_coeff_among_datasets():
 
     with open('pearson_scores_ensemble_' + str(args.nway) + 'way.pkl', 'wb') as fp:
         pickle.dump(pearson_scores, fp)
+
+def get_jaccard_among_datasets_by_backbones():
+    n_datasets = len(data_folders)
+    jaccard_scores = defaultdict(list)
+
+    fp = open('jaccard_scores_ensemble_'+str(args.nway)+'way_by_backbones.txt', 'w')
+    fp.write("Jaccard indices broken down by backbones(on top 20% features, " + str(args.nway)
+             + "  way) on all available images between pairs of datasets: \n\n")
+    n_top_features = int(sum(list(features_dim_map.values())) * 0.2)
+    for idx1 in range(n_datasets-1):
+        for idx2 in range(idx1+1, n_datasets):
+            fp.write(data_folders[idx1] + ", " + data_folders[idx2] + ": "  + "\n")
+            top_features_1 = np.argsort(weightsL1_dict[data_folders[idx1]])[::-1][:n_top_features]
+            top_features_2 = np.argsort(weightsL1_dict[data_folders[idx2]])[::-1][:n_top_features]
+            #The order of the backbones have to be fixed!!
+            for model_idx, backbone in enumerate(model_names):
+                features_dataset_1 = [x for x in top_features_1 if star_end_idx[backbone][0]
+                                      <= x < star_end_idx[backbone][1]]
+                features_dataset_2 = [x for x in top_features_2 if star_end_idx[backbone][0]
+                                      <= x < star_end_idx[backbone][1]]
+                score = jaccard_similarity(features_dataset_1, features_dataset_2)
+                jaccard_scores[backbone].append(score)  # order of datasets is important
+                fp.write("\t " + backbone + ": " + str(score) + "\n")
+            fp.write("\n")
+
+    fp.close()
+    with open('jaccard_scores_ensemble_'+str(args.nway)+'way_by_backbones.pkl', 'wb') as fp:
+        pickle.dump(jaccard_scores, fp)
+
+
+def get_fraction_by_backbones():
+    n_datasets = len(data_folders)
+
+    fp = open('fraction_top_features_' + str(args.nway) + 'way_by_backbones.txt', 'w')
+    fp.write("Fraction of top 20% features broken down by backbones(" + str(args.nway)
+             + "  way) on all available images between pairs of datasets: \n\n")
+    n_top_features = int(sum(list(features_dim_map.values())) * 0.2)
+    for idx1 in range(n_datasets):
+        fp.write(data_folders[idx1] + ": "  + "\n")
+        top_features = np.argsort(weightsL1_dict[data_folders[idx1]])[::-1][:n_top_features]
+        #The order of the backbones have to be fixed!!
+        for model_idx, backbone in enumerate(model_names):
+            features_dataset = [x for x in top_features if star_end_idx[backbone][0]
+                                  <= x < star_end_idx[backbone][1]]
+            fraction_dataset = round(len(features_dataset)/n_top_features * 100, 2)
+            fp.write("\t " + backbone + ": " + str(fraction_dataset) + "%\n")
+        fp.write("\n")
+
+    fp.close()
 
 def get_jaccard_fewVsAll():
     if args.nol2:
@@ -172,8 +220,9 @@ def get_pearson_coeff_fewVsAll():
 def main():
     # get_pearson_coeff_among_datasets()
     # get_jaccard_among_datasets()
-    get_pearson_coeff_fewVsAll()
-    get_jaccard_fewVsAll()
-
+    # get_pearson_coeff_fewVsAll()
+    # get_jaccard_fewVsAll()
+    # get_jaccard_among_datasets_by_backbones()
+    get_fraction_by_backbones()
 if __name__=='__main__':
     main()

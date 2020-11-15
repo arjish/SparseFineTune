@@ -99,7 +99,8 @@ if __name__ == '__main__':
 
     model = model.cuda()
 
-    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.sourcedata, params.model, params.method)
+    print("checkpoint_dir:", checkpoint_dir)
     if params.train_aug:
         checkpoint_dir += '_aug'
     if not params.method in ['baseline', 'baseline++'] :
@@ -156,7 +157,9 @@ if __name__ == '__main__':
         acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
 
     else:
-        novel_file = os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
+        features_dir = checkpoint_dir.replace(params.sourcedata, params.dataset).replace("checkpoints", "features")
+        print("features_dir:", features_dir)
+        novel_file = os.path.join( features_dir, split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
         cl_data_file = feat_loader.init_loader(novel_file)
 
         for i in range(iter_num):

@@ -82,11 +82,12 @@ if __name__ == '__main__':
     else:
         loadfile = configs.data_dir[params.dataset] + split + '.json'
 
-    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.sourcedata, params.model, params.method)
     if params.train_aug:
         checkpoint_dir += '_aug'
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+    print("checkpoint_dir:", checkpoint_dir)
 
     if params.save_iter != -1:
         modelfile   = get_assigned_file(checkpoint_dir,params.save_iter)
@@ -95,10 +96,12 @@ if __name__ == '__main__':
     else:
         modelfile   = get_best_file(checkpoint_dir)
 
+    features_dir = checkpoint_dir.replace(params.sourcedata, params.dataset).replace("checkpoints","features")
+    print("features_dir:", features_dir)
     if params.save_iter != -1:
-        outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + "_" + str(params.save_iter)+ ".hdf5") 
+        outfile = os.path.join( features_dir, split + "_" + str(params.save_iter)+ ".hdf5")
     else:
-        outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + ".hdf5") 
+        outfile = os.path.join( features_dir, split + ".hdf5")
 
     datamgr         = SimpleDataManager(image_size, batch_size = 64)
     data_loader      = datamgr.get_data_loader(loadfile, aug = False)
